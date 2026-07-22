@@ -9,6 +9,17 @@
 <body>
   <div class="container">
     <h2>Benjamin Graham Stock Valuation</h2>
+
+    <!-- Stock Name Search Box -->
+    <div class="search-box">
+      <label for="stock-name">Search Company Name:</label>
+      <div class="input-inline">
+        <input type="text" id="stock-name" placeholder="e.g. Reliance, Tata Motors, Apple">
+        <button type="button" id="search-btn">Search & Auto-Fill</button>
+      </div>
+      <small id="selected-symbol-text" style="color: #2563eb; font-weight: 600;"></small>
+    </div>
+
     <form id="calc-form">
       <div class="input-group">
         <label for="cmp">Current Market Price (CMP):</label>
