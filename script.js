@@ -1,51 +1,66 @@
 const API_KEY = 'Mb6QeTf9ipELxuRgxAfEJtBheOB6PobT';
 
-// Auto-fetch data from API
-document.getElementById('fetch-btn').addEventListener('click', async () => {
-  const symbol = document.getElementById('ticker').value.trim().toUpperCase();
-  if (!symbol) {
-    alert('Please enter a stock ticker (e.g., RELIANCE.NS or AAPL)');
+// Step 1: Search symbol by company name, then fetch market data
+document.getElementById('search-btn').addEventListener('click', async () => {
+  const query = document.getElementById('stock-name').value.trim();
+  if (!query) {
+    alert('Please enter a company name (e.g., Reliance, Tata, Apple)');
     return;
   }
 
-  const fetchBtn = document.getElementById('fetch-btn');
-  fetchBtn.textContent = 'Fetching...';
+  const searchBtn = document.getElementById('search-btn');
+  const symbolText = document.getElementById('selected-symbol-text');
+  searchBtn.textContent = 'Searching...';
+  symbolText.textContent = '';
 
   try {
-    // 1. Fetch Real-time Stock Price & EPS
-    const quoteRes = await fetch(`https://financialmodelingprep.com/api/v3/quote/${symbol}?apikey=${API_KEY}`);
-    const quoteData = await quoteRes.json();
+    // 1. Search for ticker symbol by company name
+    const searchRes = await fetch(`https://financialmodelingprep.com/api/v3/search?query=${encodeURIComponent(query)}&limit=5&apikey=${API_KEY}`);
+    const searchData = await searchRes.json();
 
-    if (!quoteData || quoteData.length === 0) {
-      alert('Stock symbol not found. Double check the ticker.');
-      fetchBtn.textContent = 'Fetch Data';
+    if (!searchData || searchData.length === 0) {
+      alert('No company found matching that name. Try a clearer search term.');
+      searchBtn.textContent = 'Search & Auto-Fill';
       return;
     }
 
-    const price = quoteData[0].price;
-    const eps = quoteData[0].eps;
+    // Pick the most relevant match (prefers NSE/BSE for Indian queries if available)
+    let bestMatch = searchData.find(item => item.symbol.endsWith('.NS')) || searchData[0];
+    const symbol = bestMatch.symbol;
+    const companyName = bestMatch.name;
 
-    // 2. Fetch Key Metrics (Book Value per share)
+    symbolText.textContent = `Found: ${companyName} (${symbol})`;
+
+    // 2. Fetch Stock Quote (Price & EPS)
+    const quoteRes = await fetch(`https://financialmodelingprep.com/api/v3/quote/${symbol}?apikey=${API_KEY}`);
+    const quoteData = await quoteRes.json();
+
+    if (quoteData && quoteData.length > 0) {
+      const price = quoteData[0].price;
+      const eps = quoteData[0].eps;
+
+      document.getElementById('cmp').value = price ? price.toFixed(2) : '';
+      document.getElementById('eps').value = eps ? eps.toFixed(2) : '';
+    }
+
+    // 3. Fetch Book Value Per Share (BVPS)
     const metricsRes = await fetch(`https://financialmodelingprep.com/api/v3/key-metrics-ttm/${symbol}?apikey=${API_KEY}`);
     const metricsData = await metricsRes.json();
 
-    const bvps = metricsData && metricsData.length > 0 ? metricsData[0].bookValuePerShareTTM : 0;
+    if (metricsData && metricsData.length > 0) {
+      const bvps = metricsData[0].bookValuePerShareTTM;
+      document.getElementById('bvps').value = bvps ? bvps.toFixed(2) : '';
+    }
 
-    // Auto-fill form inputs
-    document.getElementById('cmp').value = price ? price.toFixed(2) : '';
-    document.getElementById('eps').value = eps ? eps.toFixed(2) : '';
-    document.getElementById('bvps').value = bvps ? bvps.toFixed(2) : '';
-
-    alert(`Data loaded for ${symbol}!`);
   } catch (err) {
-    console.error('API Fetch Error:', err);
-    alert('Failed to fetch data. Please check your network or try again.');
+    console.error('API Search Error:', err);
+    alert('Error retrieving data. Check network or search term.');
   } finally {
-    fetchBtn.textContent = 'Fetch Data';
+    searchBtn.textContent = 'Search & Auto-Fill';
   }
 });
 
-// Calculate Graham Valuation
+// Step 2: Calculate Graham Valuation
 document.getElementById('calc-form').addEventListener('submit', function (e) {
   e.preventDefault();
 
@@ -63,7 +78,7 @@ document.getElementById('calc-form').addEventListener('submit', function (e) {
     return;
   }
 
-  // Graham Number Formula: sqrt(22.5 * EPS * BVPS)
+  // Graham Number: sqrt(22.5 * EPS * BVPS)
   const grahamNumber = Math.sqrt(22.5 * eps * bvps);
 
   // Intrinsic Value Formula: (EPS * (8.5 + 2g) * 4.4) / Y
