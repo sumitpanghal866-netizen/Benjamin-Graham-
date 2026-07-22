@@ -1,7 +1,54 @@
+const API_KEY = 'Mb6QeTf9ipELxuRgxAfEJtBheOB6PobT';
+
+// Auto-fetch data from API
+document.getElementById('fetch-btn').addEventListener('click', async () => {
+  const symbol = document.getElementById('ticker').value.trim().toUpperCase();
+  if (!symbol) {
+    alert('Please enter a stock ticker (e.g., RELIANCE.NS or AAPL)');
+    return;
+  }
+
+  const fetchBtn = document.getElementById('fetch-btn');
+  fetchBtn.textContent = 'Fetching...';
+
+  try {
+    // 1. Fetch Real-time Stock Price & EPS
+    const quoteRes = await fetch(`https://financialmodelingprep.com/api/v3/quote/${symbol}?apikey=${API_KEY}`);
+    const quoteData = await quoteRes.json();
+
+    if (!quoteData || quoteData.length === 0) {
+      alert('Stock symbol not found. Double check the ticker.');
+      fetchBtn.textContent = 'Fetch Data';
+      return;
+    }
+
+    const price = quoteData[0].price;
+    const eps = quoteData[0].eps;
+
+    // 2. Fetch Key Metrics (Book Value per share)
+    const metricsRes = await fetch(`https://financialmodelingprep.com/api/v3/key-metrics-ttm/${symbol}?apikey=${API_KEY}`);
+    const metricsData = await metricsRes.json();
+
+    const bvps = metricsData && metricsData.length > 0 ? metricsData[0].bookValuePerShareTTM : 0;
+
+    // Auto-fill form inputs
+    document.getElementById('cmp').value = price ? price.toFixed(2) : '';
+    document.getElementById('eps').value = eps ? eps.toFixed(2) : '';
+    document.getElementById('bvps').value = bvps ? bvps.toFixed(2) : '';
+
+    alert(`Data loaded for ${symbol}!`);
+  } catch (err) {
+    console.error('API Fetch Error:', err);
+    alert('Failed to fetch data. Please check your network or try again.');
+  } finally {
+    fetchBtn.textContent = 'Fetch Data';
+  }
+});
+
+// Calculate Graham Valuation
 document.getElementById('calc-form').addEventListener('submit', function (e) {
   e.preventDefault();
 
-  // Get input values
   const cmp = parseFloat(document.getElementById('cmp').value);
   const eps = parseFloat(document.getElementById('eps').value);
   const bvps = parseFloat(document.getElementById('bvps').value);
@@ -11,28 +58,25 @@ document.getElementById('calc-form').addEventListener('submit', function (e) {
   const resultsDiv = document.getElementById('results');
   const statusDiv = document.getElementById('valuation-status');
 
-  // Handle invalid edge cases (e.g. negative earnings or book value)
   if (eps <= 0 || bvps <= 0) {
     alert("Graham's formula requires positive EPS and Book Value.");
     return;
   }
 
-  // 1. Calculate Graham Number
+  // Graham Number Formula: sqrt(22.5 * EPS * BVPS)
   const grahamNumber = Math.sqrt(22.5 * eps * bvps);
 
-  // 2. Calculate Revised Intrinsic Value
-  // V = (EPS * (8.5 + 2g) * 4.4) / Y
+  // Intrinsic Value Formula: (EPS * (8.5 + 2g) * 4.4) / Y
   const intrinsicValue = (eps * (8.5 + 2 * g) * 4.4) / Y;
 
-  // Display results
-  document.getElementById('graham-number').textContent = grahamNumber.toFixed(2);
-  document.getElementById('intrinsic-value').textContent = intrinsicValue.toFixed(2);
+  document.getElementById('graham-number').textContent = '₹' + grahamNumber.toFixed(2);
+  document.getElementById('intrinsic-value').textContent = '₹' + intrinsicValue.toFixed(2);
 
-  // Evaluate status against Graham Number
   resultsDiv.classList.remove('hidden');
 
   if (cmp < grahamNumber) {
-    statusDiv.textContent = `Undervalued (Margin of Safety: ${(((grahamNumber - cmp) / grahamNumber) * 100).toFixed(1)}%)`;
+    const margin = (((grahamNumber - cmp) / grahamNumber) * 100).toFixed(1);
+    statusDiv.textContent = `Undervalued (Margin of Safety: ${margin}%)`;
     statusDiv.className = 'status undervalued';
   } else {
     statusDiv.textContent = `Overvalued relative to Graham Number`;
